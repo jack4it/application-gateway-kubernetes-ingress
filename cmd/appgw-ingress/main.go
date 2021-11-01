@@ -120,7 +120,7 @@ func main() {
 	}
 	klog.Infof("Using User Agent Suffix='%s' when communicating with ARM", uniqueUserAgentSuffix)
 
-	azClient := azure.NewAzClient(azure.SubscriptionID(env.SubscriptionID), azure.ResourceGroup(env.ResourceGroupName), azure.ResourceName(env.AppGwName), uniqueUserAgentSuffix, env.ClientID)
+	azClient := azure.NewAzClient(azure.SubscriptionID(env.SubscriptionID), azure.ResourceGroup(env.ResourceGroupName), azure.ResourceName(env.AppGwName), uniqueUserAgentSuffix, env.ClientID, env)
 	appGwIdentifier := appgw.Identifier{
 		SubscriptionID: env.SubscriptionID,
 		ResourceGroup:  env.ResourceGroupName,

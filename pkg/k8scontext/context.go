@@ -64,6 +64,7 @@ func NewContext(kubeClient kubernetes.Interface, crdClient versioned.Interface, 
 		Pods:      informerFactory.Core().V1().Pods().Informer(),
 		Secret:    informerFactory.Core().V1().Secrets().Informer(),
 		Service:   informerFactory.Core().V1().Services().Informer(),
+		Node:      informerFactory.Core().V1().Nodes().Informer(),
 
 		AzureIngressProhibitedTarget:                crdInformerFactory.Azureingressprohibitedtargets().V1().AzureIngressProhibitedTargets().Informer(),
 		AzureApplicationGatewayBackendPool:          crdInformerFactory.Azureapplicationgatewaybackendpools().V1beta1().AzureApplicationGatewayBackendPools().Informer(),
@@ -86,6 +87,7 @@ func NewContext(kubeClient kubernetes.Interface, crdClient versioned.Interface, 
 		Pods:                               informerCollection.Pods.GetStore(),
 		Secret:                             informerCollection.Secret.GetStore(),
 		Service:                            informerCollection.Service.GetStore(),
+		Node:                               informerCollection.Node.GetStore(),
 		AzureIngressProhibitedTarget:       informerCollection.AzureIngressProhibitedTarget.GetStore(),
 		AzureApplicationGatewayBackendPool: informerCollection.AzureApplicationGatewayBackendPool.GetStore(),
 		AzureApplicationGatewayInstanceUpdateStatus: informerCollection.AzureApplicationGatewayInstanceUpdateStatus.GetStore(),
@@ -180,6 +182,7 @@ func (c *Context) Run(stopChannel chan struct{}, omitCRDs bool, envVariables env
 		c.informers.Service,
 		c.informers.Secret,
 		c.informers.Ingress,
+		c.informers.Node,
 
 		//TODO: enabled by ccp feature flag
 		// c.informers.AzureApplicationGatewayBackendPool,

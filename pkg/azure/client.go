@@ -9,6 +9,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+
+	"github.com/Azure/application-gateway-kubernetes-ingress/pkg/environment"
 
 	r "github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/resources"
 	n "github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-03-01/network"
@@ -51,10 +54,11 @@ type azClient struct {
 	memoizedIPs       map[string]n.PublicIPAddress
 
 	ctx context.Context
+	env environment.EnvVariables
 }
 
 // NewAzClient returns an Azure Client
-func NewAzClient(subscriptionID SubscriptionID, resourceGroupName ResourceGroup, appGwName ResourceName, uniqueUserAgentSuffix, clientID string) AzClient {
+func NewAzClient(subscriptionID SubscriptionID, resourceGroupName ResourceGroup, appGwName ResourceName, uniqueUserAgentSuffix, clientID string, env environment.EnvVariables) AzClient {
 	settings, err := auth.GetSettingsFromEnvironment()
 	if err != nil {
 		return nil
@@ -77,6 +81,7 @@ func NewAzClient(subscriptionID SubscriptionID, resourceGroupName ResourceGroup,
 		memoizedIPs:       make(map[string]n.PublicIPAddress),
 
 		ctx: context.Background(),
+		env: env,
 	}
 
 	if err := az.appGatewaysClient.AddToUserAgent(userAgent); err != nil {
@@ -247,11 +252,14 @@ func (az *azClient) ApplyRouteTable(subnetID string, routeTableID string) error 
 	}
 
 	if subnet.RouteTable != nil {
-		if *subnet.RouteTable.ID != routeTableID {
+		if !strings.EqualFold(*subnet.RouteTable.ID, routeTableID) {
 			klog.V(5).Infof("Skipping associating Application Gateway subnet '%s' with route table '%s' used by k8s cluster as it is already associated to route table '%s'.",
 				subnetID,
 				routeTableID,
 				*subnet.SubnetPropertiesFormat.RouteTable.ID)
+			if az.env.SyncRouteTable {
+				go az.syncRouteTable(routeTableID, *subnet.RouteTable.ID)
+			}
 		} else {
 			klog.V(5).Infof("Application Gateway subnet '%s' is associated with route table '%s' used by k8s cluster.",
 				subnetID,
@@ -429,6 +437,10 @@ func (az *azClient) createDeployment(subnetID, skuName string) (deployment r.Dep
 		return
 	}
 	return deploymentFuture.Result(az.deploymentsClient)
+}
+
+func (az *azClient) syncRouteTable(string, string) {
+
 }
 
 func getTemplate() map[string]interface{} {

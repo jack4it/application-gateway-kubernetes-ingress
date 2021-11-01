@@ -100,6 +100,11 @@ const (
 
 	// MultiClusterModeVarName is an environment variable to control whether AGIC monitors Ingresses or MutliClusterIngresses
 	MultiClusterModeVarName = "MULTI_CLUSTER_MODE"
+
+	// SyncRouteTable is an environment variable to control whether to sync the node subnet route table rules to
+	// the specified app gateway subnet route table. It only has effect when Kubenet is used (hence there is a node subnet
+	// route table) and a different route table is specified for the app gateway subnet
+	SyncRouteTable = "SYNC_ROUTE_TABLE"
 )
 
 var (
@@ -138,6 +143,7 @@ type EnvVariables struct {
 	HostedOnUnderlay            bool
 	ReconcilePeriodSeconds      string
 	MultiClusterMode            bool
+	SyncRouteTable              bool
 }
 
 // Consolidate sets defaults and missing values using cpConfig
@@ -201,6 +207,7 @@ func GetEnv() EnvVariables {
 		HostedOnUnderlay:            GetEnvironmentVariable(HostedOnUnderlayVarName, "false", boolValidator) == "true",
 		ReconcilePeriodSeconds:      os.Getenv(ReconcilePeriodSecondsVarName),
 		MultiClusterMode:            multiClusterMode,
+		SyncRouteTable: 			 GetEnvironmentVariable(SyncRouteTable, "false", boolValidator) == "true",
 	}
 
 	return env
