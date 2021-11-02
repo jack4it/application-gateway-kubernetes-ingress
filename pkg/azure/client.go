@@ -11,8 +11,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/Azure/application-gateway-kubernetes-ingress/pkg/environment"
-
 	r "github.com/Azure/azure-sdk-for-go/profiles/latest/resources/mgmt/resources"
 	n "github.com/Azure/azure-sdk-for-go/services/network/mgmt/2021-03-01/network"
 	"github.com/Azure/go-autorest/autorest"
@@ -28,7 +26,7 @@ import (
 type AzClient interface {
 	SetAuthorizer(authorizer autorest.Authorizer)
 
-	ApplyRouteTable(string, string) error
+	ApplyRouteTable(string, string) (bool, error)
 	WaitForGetAccessOnGateway() error
 	GetGateway() (n.ApplicationGateway, error)
 	UpdateGateway(*n.ApplicationGateway) error
@@ -54,11 +52,10 @@ type azClient struct {
 	memoizedIPs       map[string]n.PublicIPAddress
 
 	ctx context.Context
-	env environment.EnvVariables
 }
 
 // NewAzClient returns an Azure Client
-func NewAzClient(subscriptionID SubscriptionID, resourceGroupName ResourceGroup, appGwName ResourceName, uniqueUserAgentSuffix, clientID string, env environment.EnvVariables) AzClient {
+func NewAzClient(subscriptionID SubscriptionID, resourceGroupName ResourceGroup, appGwName ResourceName, uniqueUserAgentSuffix, clientID string) AzClient {
 	settings, err := auth.GetSettingsFromEnvironment()
 	if err != nil {
 		return nil
@@ -81,7 +78,6 @@ func NewAzClient(subscriptionID SubscriptionID, resourceGroupName ResourceGroup,
 		memoizedIPs:       make(map[string]n.PublicIPAddress),
 
 		ctx: context.Background(),
-		env: env,
 	}
 
 	if err := az.appGatewaysClient.AddToUserAgent(userAgent); err != nil {
@@ -226,7 +222,9 @@ func (az *azClient) GetPublicIP(resourceID string) (n.PublicIPAddress, error) {
 	return ip, nil
 }
 
-func (az *azClient) ApplyRouteTable(subnetID string, routeTableID string) error {
+func (az *azClient) ApplyRouteTable(subnetID string, routeTableID string) (nonK8sClusterRouteTableUsed bool, err error) {
+	nonK8sClusterRouteTableUsed = false
+	err = nil
 	// Check if the route table exists
 	_, routeTableResourceGroup, routeTableName := ParseResourceID(routeTableID)
 	routeTable, err := az.routeTablesClient.Get(az.ctx, string(routeTableResourceGroup), string(routeTableName), "")
@@ -236,19 +234,19 @@ func (az *azClient) ApplyRouteTable(subnetID string, routeTableID string) error 
 		klog.V(5).Infof("Error getting route table '%s' (this is relevant for AKS clusters using 'Kubenet' network plugin): %s",
 			routeTableID,
 			err.Error())
-		return nil
+		return
 	}
 
 	if err != nil {
 		// no access or no route table
-		return err
+		return
 	}
 
 	// Get subnet and check if it is already associated to a route table
 	_, subnetResourceGroup, subnetVnetName, subnetName := ParseSubResourceID(subnetID)
 	subnet, err := az.subnetsClient.Get(az.ctx, string(subnetResourceGroup), string(subnetVnetName), string(subnetName), "")
 	if err != nil {
-		return err
+		return
 	}
 
 	if subnet.RouteTable != nil {
@@ -257,16 +255,14 @@ func (az *azClient) ApplyRouteTable(subnetID string, routeTableID string) error 
 				subnetID,
 				routeTableID,
 				*subnet.SubnetPropertiesFormat.RouteTable.ID)
-			if az.env.SyncRouteTable {
-				go az.syncRouteTable(routeTableID, *subnet.RouteTable.ID)
-			}
+			nonK8sClusterRouteTableUsed = true
 		} else {
 			klog.V(5).Infof("Application Gateway subnet '%s' is associated with route table '%s' used by k8s cluster.",
 				subnetID,
 				routeTableID)
 		}
 
-		return nil
+		return
 	}
 
 	klog.Infof("Associating Application Gateway subnet '%s' with route table '%s' used by k8s cluster.", subnetID, routeTableID)
@@ -274,16 +270,16 @@ func (az *azClient) ApplyRouteTable(subnetID string, routeTableID string) error 
 
 	subnetFuture, err := az.subnetsClient.CreateOrUpdate(az.ctx, string(subnetResourceGroup), string(subnetVnetName), string(subnetName), subnet)
 	if err != nil {
-		return err
+		return
 	}
 
 	// Wait until deployment finshes and save the error message
 	err = subnetFuture.WaitForCompletionRef(az.ctx, az.subnetsClient.BaseClient.Client)
 	if err != nil {
-		return err
+		return
 	}
 
-	return nil
+	return
 }
 
 // DeployGatewayWithVnet creates Application Gateway within the specifid VNet. Implements AzClient interface.
@@ -437,10 +433,6 @@ func (az *azClient) createDeployment(subnetID, skuName string) (deployment r.Dep
 		return
 	}
 	return deploymentFuture.Result(az.deploymentsClient)
-}
-
-func (az *azClient) syncRouteTable(string, string) {
-
 }
 
 func getTemplate() map[string]interface{} {

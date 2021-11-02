@@ -120,7 +120,7 @@ func main() {
 	}
 	klog.Infof("Using User Agent Suffix='%s' when communicating with ARM", uniqueUserAgentSuffix)
 
-	azClient := azure.NewAzClient(azure.SubscriptionID(env.SubscriptionID), azure.ResourceGroup(env.ResourceGroupName), azure.ResourceName(env.AppGwName), uniqueUserAgentSuffix, env.ClientID, env)
+	azClient := azure.NewAzClient(azure.SubscriptionID(env.SubscriptionID), azure.ResourceGroup(env.ResourceGroupName), azure.ResourceName(env.AppGwName), uniqueUserAgentSuffix, env.ClientID)
 	appGwIdentifier := appgw.Identifier{
 		SubscriptionID: env.SubscriptionID,
 		ResourceGroup:  env.ResourceGroupName,
@@ -210,12 +210,23 @@ func main() {
 		subnetID := *(*appGw.GatewayIPConfigurations)[0].Subnet.ID
 		routeTableID := azure.RouteTableID(azure.SubscriptionID(cpConfig.SubscriptionID), azure.ResourceGroup(cpConfig.RouteTableResourceGroup), azure.ResourceName(cpConfig.RouteTableName))
 
-		err = azClient.ApplyRouteTable(subnetID, routeTableID)
+		nonK8sClusterRouteTableUsed, err := azClient.ApplyRouteTable(subnetID, routeTableID)
 		if err != nil {
-			klog.V(5).Infof("Unable to associate Application Gateway subnet '%s' with route table '%s' due to error (this is relevant for AKS clusters using 'Kubenet' network plugin): [%+v]",
-				subnetID,
-				routeTableID,
-				err)
+			format := "Unable to associate Application Gateway subnet '%s' with route table '%s' due to error (this is relevant for AKS clusters using 'Kubenet' network plugin): [%+v]"
+			if env.SyncRouteTable {
+				// fail if route table sync is intended
+				klog.Fatalf(format,
+					subnetID,
+					routeTableID,
+					err)
+			} else {
+				klog.V(5).Infof(format,
+					subnetID,
+					routeTableID,
+					err)
+			}
+		} else if nonK8sClusterRouteTableUsed && env.SyncRouteTable {
+			// setup route table sync
 		}
 	}
 
