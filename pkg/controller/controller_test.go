@@ -35,7 +35,7 @@ var _ = Describe("test NewAppGwIngressController", func() {
 		recorder := record.NewFakeRecorder(0)
 		controller := NewAppGwIngressController(azClient, appGwIdentifier, k8sContext, recorder, metricStore, nil, false)
 		It("should have created the AppGwIngressController struct", func() {
-			err := controller.Start(environment.GetEnv())
+			err := controller.Start(environment.GetEnv(), false)
 			Expect(err).To(HaveOccurred())
 			controller.Stop()
 		})
@@ -80,7 +80,7 @@ var _ = Describe("test NewAppGwIngressController", func() {
 
 			env := environment.GetFakeEnv()
 			env.ReconcilePeriodSeconds = "1"
-			err := controller.Start(env)
+			err := controller.Start(env, false)
 			Expect(err).To(BeNil())
 
 			// wait for reconcilerTickerTask to be added to the work queue

@@ -206,6 +206,7 @@ func main() {
 	}
 
 	// associate route table to application gateway subnet
+	var syncRouteTable bool
 	if cpConfig != nil && cpConfig.RouteTableName != "" {
 		subnetID := *(*appGw.GatewayIPConfigurations)[0].Subnet.ID
 		routeTableID := azure.RouteTableID(azure.SubscriptionID(cpConfig.SubscriptionID), azure.ResourceGroup(cpConfig.RouteTableResourceGroup), azure.ResourceName(cpConfig.RouteTableName))
@@ -226,11 +227,11 @@ func main() {
 					err)
 			}
 		} else if nonK8sClusterRouteTableUsed && env.SyncRouteTable {
-			// setup route table sync
+			syncRouteTable = true
 		}
 	}
 
-	if err := appGwIngressController.Start(env); err != nil {
+	if err := appGwIngressController.Start(env, syncRouteTable); err != nil {
 		errorLine := fmt.Sprint("Could not start AGIC: ", err)
 		if agicPod != nil {
 			recorder.Event(agicPod, v1.EventTypeWarning, events.ReasonARMAuthFailure, errorLine)

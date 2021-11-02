@@ -182,7 +182,6 @@ func (c *Context) Run(stopChannel chan struct{}, omitCRDs bool, envVariables env
 		c.informers.Service,
 		c.informers.Secret,
 		c.informers.Ingress,
-		c.informers.Node,
 
 		//TODO: enabled by ccp feature flag
 		// c.informers.AzureApplicationGatewayBackendPool,
@@ -203,6 +202,16 @@ func (c *Context) Run(stopChannel chan struct{}, omitCRDs bool, envVariables env
 
 	if envVariables.EnableIstioIntegration {
 		sharedInformers = append(sharedInformers, c.informers.IstioGateway, c.informers.IstioVirtualService)
+	}
+
+	if envVariables.SyncRouteTable {
+		c.informers.Node.AddEventHandler(cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+
+			},
+
+		})
+		sharedInformers = append(sharedInformers, c.informers.Node)
 	}
 
 	for _, informer := range sharedInformers {
