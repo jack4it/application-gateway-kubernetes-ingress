@@ -207,7 +207,7 @@ func GetEnv() EnvVariables {
 		HostedOnUnderlay:            GetEnvironmentVariable(HostedOnUnderlayVarName, "false", boolValidator) == "true",
 		ReconcilePeriodSeconds:      os.Getenv(ReconcilePeriodSecondsVarName),
 		MultiClusterMode:            multiClusterMode,
-		SyncRouteTable: 			 GetEnvironmentVariable(SyncRouteTable, "false", boolValidator) == "true",
+		SyncRouteTable:              GetEnvironmentVariable(SyncRouteTable, "false", boolValidator) == "true",
 	}
 
 	return env
